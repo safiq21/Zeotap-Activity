@@ -1,0 +1,144 @@
+
+import sqlite3
+
+class Node:
+    def __init__(self, node_type, left=None, right=None, value=None):
+        self.node_type = node_type
+        self.left = left
+        self.right = right
+        self.value = value
+
+def create_rule(rule_string):
+    if "AND" in rule_string:
+        parts = rule_string.split(" AND ")
+        left = create_rule(parts[0].strip())
+        right = create_rule(" AND ".join(parts[1:]).strip())
+        return Node("operator", left=left, right=right, value="AND")
+    elif "OR" in rule_string:
+        parts = rule_string.split(" OR ")
+        left = create_rule(parts[0].strip())
+        right = create_rule(" OR ".join(parts[1:]).strip())
+        return Node("operator", left=left, right=right, value="OR")
+    else:
+        return Node("operand", value=rule_string.strip())
+
+def combine_rules(rules):
+    if not rules:
+        return None
+    combined_node = create_rule(rules[0])
+    for rule in rules[1:]:
+        combined_node = Node("operator", left=combined_node, right=create_rule(rule), value="AND")
+    return combined_node
+
+def evaluate_rule(ast, data):
+    if ast.node_type == "operand":
+        condition = ast.value
+        if ">" in condition:
+            var, value = condition.split(">")
+            return data[var.strip()] > int(value.strip())
+        elif "<" in condition:
+            var, value = condition.split("<")
+            return data[var.strip()] < int(value.strip())
+        elif "=" in condition:
+            var, value = condition.split("=")
+            return data[var.strip()] == value.strip().strip("'")
+    elif ast.node_type == "operator":
+        if ast.value == "AND":
+            return evaluate_rule(ast.left, data) and evaluate_rule(ast.right, data)
+        elif ast.value == "OR":
+            return evaluate_rule(ast.left, data) or evaluate_rule(ast.right, data)
+    return False
+
+def initialize_database():
+    conn = sqlite3.connect('rules.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rule_string TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def add_rule(rule_string):
+    conn = sqlite3.connect('rules.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO rules (rule_string) VALUES (?)', (rule_string,))
+    conn.commit()
+    conn.close()
+
+def get_all_rules():
+    conn = sqlite3.connect('rules.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT rule_string FROM rules')
+    rules = cursor.fetchall()
+    conn.close()
+    return [rule[0] for rule in rules]
+
+def main():
+    initialize_database()
+    
+    while True:
+        print("\nRule Engine Menu:")
+        print("1. Add Rule")
+        print("2. Retrieve Rules")
+        print("3. Evaluate Rule")
+        print("4. Evaluate Combined Rule")
+        print("5. Exit")
+        
+        choice = input("Enter your choice: ")
+        
+        if choice == "1":
+            rule_string = input("Enter the rule string: ")
+            add_rule(rule_string)
+            print("Rule added successfully!")
+        elif choice == "2":
+            rules_from_db = get_all_rules()
+            if not rules_from_db:
+                print("No rules available!")
+            else:
+                for i, rule in enumerate(rules_from_db):
+                    print(f"Rule {i + 1}: {rule}")
+        elif choice == "3":
+            rules_from_db = get_all_rules()
+            if not rules_from_db:
+                print("No rules available!")
+                continue
+            for i, rule in enumerate(rules_from_db):
+                print(f"Rule {i + 1}: {rule}")
+            rule_choice = int(input("Enter the rule number to evaluate: ")) - 1
+            if rule_choice < 0 or rule_choice >= len(rules_from_db):
+                print("Invalid rule choice!")
+                continue
+            ast = create_rule(rules_from_db[rule_choice])
+            data = {
+                "age": int(input("Enter age: ")), 
+                "department": input("Enter department: "), 
+                "salary": int(input("Enter salary: ")), 
+                "experience": int(input("Enter experience: "))
+            }
+            result = evaluate_rule(ast, data)
+            print(f"Rule {rule_choice + 1} evaluation result: {result}")
+        elif choice == "4":
+            rules_from_db = get_all_rules()
+            if not rules_from_db:
+                print("No rules available!")
+                continue
+            combined_ast = combine_rules(rules_from_db)
+            data = {
+                "age": int(input("Enter age: ")), 
+                "department": input("Enter department: "), 
+                "salary": int(input("Enter salary: ")), 
+                "experience": int(input("Enter experience: "))
+            }
+            result = evaluate_rule(combined_ast, data)
+            print(f"Combined rule evaluation result: {result}")
+        elif choice == "5":
+            print("Exiting the rule engine.")
+            break
+        else:
+            print("Invalid choice! Please try again.")
+            
+if __name__ == "__main__":
+    main()
