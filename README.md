@@ -1,4 +1,4 @@
-# Zeotap-Activity
+# Zeotap-Activity1
 # Rule Engine
 
 A simple rule engine implemented in Python, which allows users to create, retrieve, and evaluate rules stored in a SQLite database. The engine supports logical operations (`AND`, `OR`) and comparison operations (`>`, `<`, `=`) to evaluate conditions based on user-provided data.
